@@ -73,7 +73,7 @@ class Episode {
 
     # constructor
     Episode([string]$Name, [string]$MediaType, [int]$Runtime) {
-        $normalizedName = Remove-RadioDiacritics -String $Name
+        $normalizedName = Remove-RadioEpisodeDiacritics -String $Name
         $normalizedName = $normalizedName.ToLower()
         $normalizedName = $normalizedName -replace ' ', '_'
         $date = Get-Date -Format 'yyyy-MM-dd-HH-mm-ss'
@@ -88,7 +88,7 @@ class Episode {
 }
 
 
-function Invoke-RadioRetryCommand {
+function Invoke-RadioEpisodeRetryCommand {
     <#
     .SYNOPSIS
     Retries a command.
@@ -169,7 +169,7 @@ function Invoke-RadioRetryCommand {
 }
 
 
-function Remove-RadioDiacritics {
+function Remove-RadioEpisodeDiacritics {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -254,7 +254,7 @@ function Set-RadioEpisodeBlobContent {
             Context   = $ctx
             Force     = $true
         }
-        Invoke-RadioRetryCommand -ScriptBlock {
+        Invoke-RadioEpisodeRetryCommand -ScriptBlock {
             Write-Verbose -Message "Uploading '$($upload.Name)' to Azure Blob.`n"
             $upload = Set-AzStorageBlobContent @StorageBlobContentParams
             Write-Verbose -Message "Uploaded '$($upload.Name)' to Azure Blob.`n"
@@ -277,8 +277,12 @@ function Invoke-RadioEpisodeFlow {
         [uri]$Uri,
 
         # Name of the Storage Account Container
+        [Parameter()]
+        [string]$ContainerName,
+
+        [ValidateSet('Start', 'Finish')]
         [Parameter(Mandatory = $true)]
-        [string]$ContainerName
+        [string]$Action
     )
 
     begin {
@@ -286,12 +290,13 @@ function Invoke-RadioEpisodeFlow {
 
     process {
         $body = @{
+            action = $Action
             container  = [System.Web.HttpUtility]::UrlEncode($ContainerName)
             fileName   = [System.Web.HttpUtility]::UrlEncode($Series.Episode.FileName)
             seriesName = [System.Web.HttpUtility]::UrlEncode($Series.Name)
         } | ConvertTo-Json
 
-        Invoke-RadioRetryCommand -ScriptBlock {
+        Invoke-RadioEpisodeRetryCommand -ScriptBlock {
             Write-Verbose -Message "Invoking webhook URI '$Uri'."
             Invoke-WebRequest -Uri $Uri -Method Post -ContentType "application/json" -Body $body -UseBasicParsing
             Write-Verbose -Message "Invoked webhook URI '$Uri'."
@@ -323,7 +328,7 @@ function Clear-RadioEpisode {
 
     process {
         # Remove any old files that exceed the number of episodes to keep.
-        Invoke-RadioRetryCommand -ScriptBlock {
+        Invoke-RadioEpisodeRetryCommand -ScriptBlock {
             Write-Verbose -Message "Retrieving list of files to delete.`n"
             $listFiles = Get-AzStorageBlob -Container $ContainerName -Context $ctx |
                 Sort-Object -Property LastModified -Descending |
@@ -339,7 +344,11 @@ function Clear-RadioEpisode {
 }
 
 
+
 $series = [Series]::New($SeriesName, $EpisodeUri, $KeepCount, $SeriesName, $MediaType, $Runtime)
+
+# Send out a flow to send a mail message that the recording has started
+Invoke-RadioEpisodeFlow -Uri $WebhookUri -Series $series -Action Start
 
 # Connect to Azure
 $credentials = Get-AutomationConnection -Name $Connection
@@ -355,6 +364,7 @@ $series = Get-RadioEpisode -Series $series
 
 Set-RadioEpisodeBlobContent -Series $series -Context $ctx -ContainerName $ContainerName
 
-Invoke-RadioEpisodeFlow -Series $series -Uri $WebhookUri -ContainerName $ContainerName
+# Send out a flow to
+Invoke-RadioEpisodeFlow -Uri $WebhookUri -Series $series -ContainerName $ContainerName -Action Finish
 
 Clear-RadioEpisode -Series $series -Context $ctx -ContainerName $ContainerName
