@@ -73,10 +73,17 @@ class Episode {
 
     # constructor
     Episode([string]$Name, [string]$MediaType, [int]$Runtime) {
+        $normalizedName = Remove-RadioDiacritics -String $Name
+        $normalizedName = $normalizedName.ToLower()
+        $normalizedName = $normalizedName -replace ' ', '_'
+        $date = Get-Date -Format 'yyyy-MM-dd-HH-mm-ss'
+        $normalizedMediaType = $MediaType.ToLower()
+
         $this.Name = $Name
         $this.MediaType = $MediaType.ToLower()
-        $this.FileName = ($Name.ToLower() -replace ' ', '_') + '-' + (Get-Date -Format 'yyyy-MM-dd-HH-mm-ss') + '.' + $MediaType.ToLower()
+        $this.FileName = $normalizedName + '-' + $date + '.' + $normalizedMediaType
         $this.Runtime = $Runtime
+
     }
 }
 
@@ -158,6 +165,24 @@ function Invoke-RadioRetryCommand {
         }
         while ($true -ne $completed)
     }
+    end {}
+}
+
+
+function Remove-RadioDiacritics {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$String
+    )
+
+    begin {}
+
+    process {
+        $normalized = $String.Normalize( [Text.NormalizationForm]::FormD )
+        ($normalized -replace '\p{M}', '')
+    }
+
     end {}
 }
 
@@ -261,9 +286,9 @@ function Invoke-RadioEpisodeFlow {
 
     process {
         $body = @{
-            container  = $ContainerName
-            seriesName = $Series.Name
-            fileName   = $Series.Episode.FileName
+            container  = [System.Web.HttpUtility]::UrlEncode($ContainerName)
+            fileName   = [System.Web.HttpUtility]::UrlEncode($Series.Episode.FileName)
+            seriesName = [System.Web.HttpUtility]::UrlEncode($Series.Name)
         } | ConvertTo-Json
 
         Invoke-RadioRetryCommand -ScriptBlock {
