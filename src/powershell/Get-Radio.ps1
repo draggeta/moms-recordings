@@ -199,20 +199,26 @@ function Get-RadioEpisode {
 
     process {
         # Start a PSJob so that the IWR cmdlet can be stopped after the wait
-        Write-Verbose -Message "Download started at '$(get-date -Format o)'.`n"
+        Write-Verbose -Message "Download started at '$(Get-Date -Format o)'.`n"
         $job = Start-Job -ScriptBlock {
-            param($Uri, $OutFile)
+            param($Uri)
+            $ProgressPreference = "SilentlyContinue"
+            $i = 0
             # outputs the storage path
             Get-Location
-            Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing > $null
-        } -InitializationScript $exportFunction -ArgumentList $Series.Uri, $Series.Episode.FileName
+            while ($true) {
+                $outFile = "{0}.rec" -f $i
+                Invoke-WebRequest -Uri $Uri -OutFile $outFile -UseBasicParsing > $null
+                $i++
+            }
+        } -InitializationScript $exportFunction -ArgumentList $Series.Uri
 
         # Wait for the timeout and the stop the job after the timeout. This is
         # basically the time this script should record.
         Write-Verbose -Message "Waiting for $($Series.Episode.Runtime) second(s)`n"
         Wait-Job -Job $job -Timeout $Series.Episode.Runtime > $null
         Stop-Job -Job $job > $null
-        Write-Verbose -Message "Download stopped at '$(get-date -Format o)'.`n"
+        Write-Verbose -Message "Download stopped at '$(Get-Date -Format o)'.`n"
 
         # Get the location and remove the job
         $location = Receive-Job -Job $job
@@ -220,6 +226,15 @@ function Get-RadioEpisode {
 
         # Returns the path of the file as output
         $Series.Episode.FilePath = Join-Path -Path $location -ChildPath $Series.Episode.FileName
+
+        # Get all recordings and concatenate them into one file
+        if ($PSVersionTable.PSVersion -lt "6.0") {
+            $rec = Get-Content -Encoding Byte -Path (Join-Path -Path $location -ChildPath "*") -Filter "*.rec" -ReadCount 512
+            $rec | Set-Content -Encoding Byte -Path $Series.Episode.FilePath
+        } else {
+            $rec = Get-Content -AsByteStream -Path (Join-Path -Path $location -ChildPath "*") -Filter "*.rec" -ReadCount 512
+            $rec | Set-Content -AsByteStream -Path $Series.Episode.FilePath
+        }
 
         $Series
     }
@@ -290,7 +305,7 @@ function Invoke-RadioEpisodeFlow {
 
     process {
         $body = @{
-            action = $Action
+            action     = $Action
             container  = [System.Web.HttpUtility]::UrlEncode($ContainerName)
             fileName   = [System.Web.HttpUtility]::UrlEncode($Series.Episode.FileName)
             seriesName = [System.Web.HttpUtility]::UrlEncode($Series.Name)
@@ -331,8 +346,8 @@ function Clear-RadioEpisode {
         Invoke-RadioEpisodeRetryCommand -ScriptBlock {
             Write-Verbose -Message "Retrieving list of files to delete.`n"
             $listFiles = Get-AzStorageBlob -Container $ContainerName -Context $ctx |
-                Sort-Object -Property LastModified -Descending |
-                Select-Object -Skip $Series.KeepCount
+            Sort-Object -Property LastModified -Descending |
+            Select-Object -Skip $Series.KeepCount
 
             Write-Verbose -Message "Removing files.`n"
             $listFiles | Remove-AzStorageBlob
