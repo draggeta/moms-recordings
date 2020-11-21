@@ -210,6 +210,7 @@ function Get-RadioEpisode {
                 $outFile = "{0}.rec" -f $i
                 Invoke-WebRequest -Uri $Uri -OutFile $outFile -UseBasicParsing > $null
                 $i++
+                Start-Sleep -Milliseconds 750
             }
         } -InitializationScript $exportFunction -ArgumentList $Series.Uri
 
