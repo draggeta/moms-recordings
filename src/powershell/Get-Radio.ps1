@@ -199,7 +199,7 @@ function Get-RadioEpisode {
 
     process {
         # Start a PSJob so that the IWR cmdlet can be stopped after the wait
-        Write-Verbose -Message "Download started at '$(Get-Date -Format o)'.`n"
+        Write-Verbose -Message "Download starting at '$(Get-Date -Format o)'.`n"
         $job = Start-Job -ScriptBlock {
             param($Uri)
             $ProgressPreference = "SilentlyContinue"
@@ -208,11 +208,14 @@ function Get-RadioEpisode {
             Get-Location
             while ($true) {
                 $outFile = "{0}.rec" -f $i
+                Write-Verbose -Message "Download started on fragment {0} with name {1}`n" -f i, $outFile
                 Invoke-WebRequest -Uri $Uri -OutFile $outFile -UseBasicParsing > $null
+                Write-Verbose -Message "Download finished/terminated for fragment {0} with name {1}`n" -f i, $outFile
                 $i++
                 Start-Sleep -Milliseconds 750
             }
         } -InitializationScript $exportFunction -ArgumentList $Series.Uri
+        Write-Verbose -Message "Download started at '$(Get-Date -Format o)'.`n"
 
         # Wait for the timeout and the stop the job after the timeout. This is
         # basically the time this script should record.
