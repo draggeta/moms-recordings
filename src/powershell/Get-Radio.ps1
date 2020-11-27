@@ -223,19 +223,21 @@ function Get-RadioEpisode {
 
         # Get the location and remove the job
         $location = Receive-Job -Job $job
+        Write-Verbose -Message "Download location is: '$location'.`n"
         Remove-Job -Job $job > $null
+        Write-Verbose -Message "Files in download location:`n$(Get-ChildItem -Path $location)`n"
 
         # Returns the path of the file as output
         $Series.Episode.FilePath = Join-Path -Path $location -ChildPath $Series.Episode.FileName
+        Write-Verbose -Message "Combined recording output path: '$($Series.Episode.FilePath)'.`n"
 
         # Get all recordings and concatenate them into one file
         if ($PSVersionTable.PSVersion -lt "6.0") {
-            $rec = Get-Content -Encoding Byte -Path (Join-Path -Path $location -ChildPath "*") -Filter "*.rec" -ReadCount 512
-            $rec | Set-Content -Encoding Byte -Path $Series.Episode.FilePath
+            Get-Content -Encoding Byte -Path (Join-Path -Path $location -ChildPath "*") -Filter "*.rec" -ReadCount 4096 | Set-Content -Encoding Byte -Path $Series.Episode.FilePath
         } else {
-            $rec = Get-Content -AsByteStream -Path (Join-Path -Path $location -ChildPath "*") -Filter "*.rec" -ReadCount 512
-            $rec | Set-Content -AsByteStream -Path $Series.Episode.FilePath
+            Get-Content -AsByteStream -Path (Join-Path -Path $location -ChildPath "*") -Filter "*.rec" -ReadCount 4096 | Set-Content -AsByteStream -Path $Series.Episode.FilePath
         }
+        Write-Verbose -Message "Combined recording file information:`n$(Get-ChildItem -Path $Series.Episode.FilePath)`n"
 
         $Series
     }
@@ -350,7 +352,7 @@ function Clear-RadioEpisode {
             Sort-Object -Property LastModified -Descending |
             Select-Object -Skip $Series.KeepCount
 
-            Write-Verbose -Message "Removing files.`n"
+            Write-Verbose -Message "Removing files:`n$($listFiles.Name | Out-String)`n"
             $listFiles | Remove-AzStorageBlob
             Write-Verbose -Message "Removed the following files:`n$($listFiles.Name | Out-String)`n"
         }
