@@ -208,11 +208,13 @@ function Get-RadioEpisode {
             Get-Location
             while ($true) {
                 $outFile = "{0}.rec" -f $i
-                Write-Verbose -Message "Download started on fragment {0} with name {1}`n" -f i, $outFile
+                $msg = "{0} Download started on fragment {1} with name {2}`n" -f (Get-Date -Format o), $i, $outFile
+                Write-Verbose -Message $msg
                 Invoke-WebRequest -Uri $Uri -OutFile $outFile -UseBasicParsing > $null
-                Write-Verbose -Message "Download finished/terminated for fragment {0} with name {1}`n" -f i, $outFile
+                $msg = "{0} Download finished/terminated for fragment {1} with name {2}`n" -f (Get-Date -Format o), $i, $outFile
+                Write-Verbose -Message $msg
                 $i++
-                Start-Sleep -Milliseconds 750
+                Start-Sleep -Milliseconds 1000
             }
         } -InitializationScript $exportFunction -ArgumentList $Series.Uri
         Write-Verbose -Message "Download started at '$(Get-Date -Format o)'.`n"
