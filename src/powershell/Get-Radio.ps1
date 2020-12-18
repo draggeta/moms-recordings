@@ -207,7 +207,7 @@ function Get-RadioEpisode {
             # outputs the storage path
             Get-Location
             while ($true) {
-                $outFile = "{0}.rec" -f $i
+                $outFile = "{0:d5}.rec" -f $i
                 $msg = "{0} Download started on fragment {1} with name {2}`n" -f (Get-Date -Format o), $i, $outFile
                 Write-Verbose -Message $msg
                 Invoke-WebRequest -Uri $Uri -OutFile $outFile -UseBasicParsing > $null
