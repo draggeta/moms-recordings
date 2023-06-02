@@ -10,9 +10,6 @@ param (
     [string]$ContainerName,
 
     [Parameter(Mandatory = $true)]
-    [string]$Connection,
-
-    [Parameter(Mandatory = $true)]
     [string]$SeriesName,
 
     [Parameter()]
@@ -374,9 +371,16 @@ $series = [Series]::New($SeriesName, $EpisodeUri, $KeepCount, $SeriesName, $Medi
 Invoke-RadioEpisodeFlow -Uri $WebhookUri -Series $series -Action Start
 
 # Connect to Azure
-$credentials = Get-AutomationConnection -Name $Connection
+# Ensures you do not inherit an AzContext in your runbook
+# Disable-AzContextAutosave -Scope Process | Out-Null
 Write-Verbose -Message "Connecting to Azure"
-Connect-AzAccount -ServicePrincipal -Tenant $credentials.TenantID -ApplicationId $credentials.ApplicationID -CertificateThumbprint $credentials.CertificateThumbprint
+
+# Connect to Azure with user-assigned managed identity
+$cid = Get-AutomationVariable "clientId"
+# $cid
+$AzureContext = (Connect-AzAccount -Identity -AccountId $cid).context
+# Set and store context
+# $AzureContext = Set-AzContext -SubscriptionName $AzureContext.Subscription -DefaultProfile $AzureContext
 
 # Connect to the storage account
 $storageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName
