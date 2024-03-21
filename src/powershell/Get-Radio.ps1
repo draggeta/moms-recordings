@@ -197,7 +197,7 @@ function Get-RadioEpisode {
     process {
         # Start a PSJob so that the IWR cmdlet can be stopped after the wait
         Write-Verbose -Message "Download starting at '$(Get-Date -Format o)'.`n"
-        $job = Start-Job -ScriptBlock {
+        $job = Start-ThreadJob -ScriptBlock {
             param($Uri)
             $ProgressPreference = "SilentlyContinue"
             $i = 0
@@ -213,7 +213,7 @@ function Get-RadioEpisode {
                 $i++
                 Start-Sleep -Milliseconds 1000
             }
-        } -InitializationScript $exportFunction -ArgumentList $Series.Uri
+        } -ArgumentList $Series.Uri
         Write-Verbose -Message "Download started at '$(Get-Date -Format o)'.`n"
 
         # Wait for the timeout and the stop the job after the timeout. This is
